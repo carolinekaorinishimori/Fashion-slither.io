@@ -338,3 +338,44 @@ input[type="color"]::-moz-color-swatch {
         height: 40px;
     }
 }
+
+/* Speed Boost Button */
+#boost-btn {
+    position: absolute;
+    bottom: 40px;
+    right: 40px;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: rgba(255, 42, 109, 0.3);
+    border: 2px solid var(--primary);
+    color: white;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    pointer-events: auto;
+    cursor: pointer;
+    backdrop-filter: blur(5px);
+    transition: all 0.2s;
+    box-shadow: 0 0 15px rgba(255, 42, 109, 0.4);
+    z-index: 100;
+}
+
+#boost-btn:active,
+#boost-btn.active {
+    background: var(--primary);
+    transform: scale(0.9);
+    box-shadow: 0 0 30px var(--primary);
+}
+
+@media (max-width: 600px) {
+    #boost-btn {
+        width: 70px;
+        height: 70px;
+        bottom: 30px;
+        right: 30px;
+        font-size: 0.8rem;
+    }
+}

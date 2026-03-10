@@ -68,9 +68,38 @@ function updateMousePos(clientX, clientY) {
     mouse.y = clientY;
     mouse.active = true;
 }
+
 window.addEventListener('mousemove', (e) => updateMousePos(e.clientX, e.clientY));
 window.addEventListener('touchmove', (e) => updateMousePos(e.touches[0].clientX, e.touches[0].clientY), { passive: false });
 window.addEventListener('touchstart', (e) => updateMousePos(e.touches[0].clientX, e.touches[0].clientY), { passive: false });
+
+// NOVO: Controle de Boost
+window.addEventListener('mousedown', (e) => { if (isPlaying) player.isBoosting = true; });
+window.addEventListener('mouseup', (e) => { if (isPlaying) player.isBoosting = false; });
+window.addEventListener('keydown', (e) => { if (e.code === 'Space' && isPlaying) player.isBoosting = true; });
+window.addEventListener('keyup', (e) => { if (e.code === 'Space' && isPlaying) player.isBoosting = false; });
+
+const boostBtn = document.getElementById('boost-btn');
+if (boostBtn) {
+    ['mousedown', 'touchstart'].forEach(evt => {
+        boostBtn.addEventListener(evt, (e) => {
+            e.preventDefault();
+            if (isPlaying) {
+                player.isBoosting = true;
+                boostBtn.classList.add('active');
+            }
+        });
+    });
+    ['mouseup', 'mouseleave', 'touchend'].forEach(evt => {
+        boostBtn.addEventListener(evt, (e) => {
+            e.preventDefault();
+            if (isPlaying) {
+                player.isBoosting = false;
+                boostBtn.classList.remove('active');
+            }
+        });
+    });
+}
 
 // ----- Classes -----
 
@@ -143,6 +172,8 @@ class Snake {
         this.radius = 20;
         this.score = 0;
         this.dead = false;
+        this.isBoosting = false;
+        this.boostTimer = 0;
 
         this.color = isPlayer ? (customBodyColor || "#ff2a6d") : botColors[Math.floor(Math.random() * botColors.length)];
 
@@ -184,6 +215,38 @@ class Snake {
 
             if (this.y < margin) this.targetAngle = Math.PI / 2;
             else if (this.y > GAME_HEIGHT - margin) this.targetAngle = -Math.PI / 2;
+
+            // Bots boostam raramente se estiverem caçando ou fugindo
+            if (Math.random() < 0.005) {
+                this.isBoosting = !this.isBoosting;
+            }
+        }
+
+        // Lógica de Boost
+        const baseSpeed = this.isPlayer ? 4.5 : 3.5;
+        const boostSpeed = baseSpeed * 1.8;
+
+        if (this.isBoosting && this.score > 5) {
+            this.speed = boostSpeed;
+            this.boostTimer++;
+
+            // Perde tamanho a cada X frames de boost
+            if (this.boostTimer % 10 === 0) {
+                this.score -= 0.5;
+                // Solta "partículas de brilho" (comida pequena) atrás
+                if (this.boostTimer % 20 === 0) {
+                    let tail = this.segments[this.segments.length - 1];
+                    foods.push(new Food(tail.x, tail.y, 0.5));
+                }
+
+                // Encolhe o corpo se o score cair muito
+                if (this.segments.length > 10 && this.score < (this.segments.length - 15) * 2) {
+                    this.segments.pop();
+                }
+            }
+        } else {
+            this.speed = baseSpeed;
+            this.isBoosting = false;
         }
 
         let dAngle = this.targetAngle - this.angle;
@@ -375,6 +438,7 @@ function initGame(pName, pHairColor, pBodyColor) {
     lastTime = performance.now();
     startScreen.classList.add('hidden');
     gameOverScreen.classList.add('hidden');
+    if (boostBtn) boostBtn.classList.remove('hidden');
     requestAnimationFrame(gameLoop);
 }
 
@@ -572,6 +636,7 @@ function endGame() {
     isPlaying = false;
     finalScoreEl.innerText = Math.floor(player.score);
     gameOverScreen.classList.remove('hidden');
+    if (boostBtn) boostBtn.classList.add('hidden');
 }
 
 // Listeners de UI
