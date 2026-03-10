@@ -250,7 +250,7 @@ class Snake {
         ctx.fill();
         ctx.shadowBlur = 0;
 
-        // Avatar (Rosto + Cabelo Desenhado)
+        // Avatar (Rosto + Cabelo Desenhado + Face Style Emoji)
         ctx.save();
         ctx.rotate(Math.PI / 2); // Gira 90 graus para a modelo olhar para frente
 
@@ -260,11 +260,37 @@ class Snake {
         ctx.arc(0, -this.radius * 0.2, this.radius * 1.1, 0, Math.PI * 2);
         ctx.fill();
 
-        // Rosto
-        ctx.fillStyle = "#ffdbac"; // Pele cor genérica
+        // Rosto (Base)
+        ctx.fillStyle = "#ffcc99"; // Pele mais amarelada estilo emoji
         ctx.beginPath();
         ctx.arc(0, 0, this.radius * 0.8, 0, Math.PI * 2);
         ctx.fill();
+
+        // Bochechas rosadas
+        ctx.fillStyle = "rgba(255, 105, 180, 0.4)";
+        ctx.beginPath();
+        ctx.arc(-this.radius * 0.4, this.radius * 0.15, this.radius * 0.15, 0, Math.PI * 2); // Esquerda
+        ctx.arc(this.radius * 0.4, this.radius * 0.15, this.radius * 0.15, 0, Math.PI * 2);  // Direita
+        ctx.fill();
+
+        // Olhos (Estilo Emoji Feliz)
+        ctx.fillStyle = "#333";
+        ctx.beginPath();
+        // Base dos olhos felizes (Arcos virados para cima)
+        ctx.lineCap = "round";
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = "#333";
+        // Olho Esquerdo
+        ctx.arc(-this.radius * 0.3, -this.radius * 0.15, this.radius * 0.15, Math.PI, 0);
+        // Olho Direito
+        ctx.moveTo(this.radius * 0.15, -this.radius * 0.15);
+        ctx.arc(this.radius * 0.3, -this.radius * 0.15, this.radius * 0.15, Math.PI, 0);
+        ctx.stroke();
+
+        // Boca (Sorriso)
+        ctx.beginPath();
+        ctx.arc(0, this.radius * 0.1, this.radius * 0.35, 0.1 * Math.PI, 0.9 * Math.PI);
+        ctx.stroke();
 
         // Franja / Cabelo da frente
         ctx.fillStyle = this.hairColor;
@@ -272,11 +298,11 @@ class Snake {
         ctx.arc(0, -this.radius * 0.3, this.radius * 0.85, 0, Math.PI);
         ctx.fill();
 
-        // Olhos (Óculos escuros de moda)
-        ctx.fillStyle = "#111";
+        // Removido os óculos de sol para mostrar o rosto estilo emoji
+        /* ctx.fillStyle = "#111";
         ctx.beginPath();
-        ctx.roundRect(-this.radius * 0.4, -this.radius * 0.1, this.radius * 0.8, this.radius * 0.3, 3);
-        ctx.fill();
+        ctx.roundRect(-this.radius*0.4, -this.radius*0.1, this.radius*0.8, this.radius*0.3, 3);
+        ctx.fill(); */
 
         ctx.restore();
 
