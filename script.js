@@ -16,6 +16,29 @@ let isPlaying = false;
 let camera = { x: 0, y: 0, zoom: 1 };
 let frameCount = 0;
 
+// Otimização: Canvas Offscreen para o Fundo (Grid)
+const bgCanvas = document.createElement('canvas');
+const bgCtx = bgCanvas.getContext('2d');
+bgCanvas.width = 1000;
+bgCanvas.height = 1000;
+
+function preRenderBackground() {
+    bgCtx.fillStyle = "#01011A";
+    bgCtx.fillRect(0, 0, 1000, 1000);
+    bgCtx.strokeStyle = "rgba(255, 42, 109, 0.08)";
+    bgCtx.lineWidth = 2;
+    const step = 100;
+    bgCtx.beginPath();
+    for (let x = 0; x <= 1000; x += step) {
+        bgCtx.moveTo(x, 0); bgCtx.lineTo(x, 1000);
+    }
+    for (let y = 0; y <= 1000; y += step) {
+        bgCtx.moveTo(0, y); bgCtx.lineTo(1000, y);
+    }
+    bgCtx.stroke();
+}
+preRenderBackground();
+
 // Arrays de Entidades
 let player;
 let bots = [];
@@ -66,7 +89,7 @@ class Particle {
         this.x += this.vx;
         this.y += this.vy;
         this.life -= this.decay;
-        this.size *= 0.95; // Encolhe com o tempo
+        this.size *= 0.95;
     }
     draw(ctx) {
         ctx.globalAlpha = Math.max(0, this.life);
@@ -83,13 +106,12 @@ class Food {
         this.x = x;
         this.y = y;
         this.value = value;
-        this.radius = 12 + (value * 1.5); // Itens mais valiosos são maiores
+        this.radius = 12 + (value * 1.5);
         this.emoji = emoji || foodEmojis[Math.floor(Math.random() * foodEmojis.length)];
         this.floatOffset = Math.random() * Math.PI * 2;
         this.animY = 0;
     }
     update(time) {
-        // Efeito de flutuação vertical leve
         this.animY = Math.sin(time * 0.005 + this.floatOffset) * 4;
     }
     draw(ctx) {
@@ -111,20 +133,19 @@ class Snake {
         this.vx = 0;
         this.vy = 0;
 
-        // Jogadores são levemente mais rápidos para ter vantagem mecânica
         this.speed = isPlayer ? 4.5 : 3.5;
         this.angle = Math.random() * Math.PI * 2;
         this.targetAngle = this.angle;
         this.turnSpeed = isPlayer ? 0.15 : 0.08;
 
         this.segments = [];
-        this.length = 15; // Tamanho inicial (quantidade de segmentos)
-        this.radius = 20; // Espessura
-        this.score = 0;   // Pontuação de fama
+        this.length = 15;
+        this.radius = 20;
+        this.score = 0;
+        this.dead = false;
 
         this.color = isPlayer ? (customBodyColor || "#ff2a6d") : botColors[Math.floor(Math.random() * botColors.length)];
 
-        // Inicializa o corpo encolhido no ponto de spawn
         for (let i = 0; i < this.length; i++) {
             this.segments.push({ x: x, y: y });
         }
@@ -132,24 +153,19 @@ class Snake {
 
     update(dt) {
         if (this.isPlayer) {
-            // Segue o Mouse/Touch
             if (mouse.active) {
-                // Como a câmera está centralizada, o centro da tela é o player
                 let targetX = mouse.x - canvas.width / 2;
                 let targetY = mouse.y - canvas.height / 2;
                 this.targetAngle = Math.atan2(targetY, targetX);
             }
         } else {
-            // IA Básica (Wander + Buscar Itens + Evitar Bordas)
-            // 1. Aleatoriedade (Wander)
             if (Math.random() < 0.02) {
                 this.targetAngle += (Math.random() - 0.5) * 2;
             }
 
-            // 2. Buscar comida próxima
             if (Math.random() < 0.1) {
                 let closest = null;
-                let minDist = 300; // Raio de visão
+                let minDist = 300;
                 for (let f of foods) {
                     let d = Math.hypot(f.x - this.x, f.y - this.y);
                     if (d < minDist) {
@@ -162,7 +178,6 @@ class Snake {
                 }
             }
 
-            // 3. Evitar paredes (Edge steering force)
             const margin = 300;
             if (this.x < margin) this.targetAngle = 0;
             else if (this.x > GAME_WIDTH - margin) this.targetAngle = Math.PI;
@@ -171,27 +186,24 @@ class Snake {
             else if (this.y > GAME_HEIGHT - margin) this.targetAngle = -Math.PI / 2;
         }
 
-        // Interpolação angular suave
         let dAngle = this.targetAngle - this.angle;
-        // Normalizar para o caminho mais curto (-PI a PI)
         while (dAngle > Math.PI) dAngle -= Math.PI * 2;
         while (dAngle < -Math.PI) dAngle += Math.PI * 2;
 
         this.angle += dAngle * this.turnSpeed;
 
-        // Movimento da Cabeça
         this.vx = Math.cos(this.angle) * this.speed;
         this.vy = Math.sin(this.angle) * this.speed;
 
         this.x += this.vx;
         this.y += this.vy;
 
-        // Limites do Mundo (Clamp)
-        this.x = Math.max(this.radius, Math.min(GAME_WIDTH - this.radius, this.x));
-        this.y = Math.max(this.radius, Math.min(GAME_HEIGHT - this.radius, this.y));
+        // NOVO: Morrer na barreira
+        if (this.x < 0 || this.x > GAME_WIDTH || this.y < 0 || this.y > GAME_HEIGHT) {
+            this.dead = true;
+        }
 
-        // Atualizar Segmentos (Cinemática Inversa Simples)
-        let dist = 12; // Distância rígida entre cada segmento do corpo
+        let dist = 12;
         let prev = { x: this.x, y: this.y };
 
         for (let i = 0; i < this.segments.length; i++) {
@@ -209,11 +221,22 @@ class Snake {
     }
 
     draw(ctx) {
-        // Desenha o corpo do fim para o começo
+        // Otimização de Culling: Não desenha se estiver fora da tela
+        const screenMargin = this.radius * 2;
+        const camLeft = camera.x - screenMargin / camera.zoom;
+        const camRight = camera.x + (canvas.width + screenMargin) / camera.zoom;
+        const camTop = camera.y - screenMargin / camera.zoom;
+        const camBot = camera.y + (canvas.height + screenMargin) / camera.zoom;
+
+        if (this.x < camLeft || this.x > camRight || this.y < camTop || this.y > camBot) {
+            // Se a cabeça está fora, checa se algum segmento está dentro (simples bounding box)
+            // Para performar melhor, vamos simplificar: se a cabeça está muito longe, ignora.
+            let distPlayer = Math.hypot(this.x - player.x, this.y - player.y);
+            if (distPlayer > 2000) return;
+        }
+
         for (let i = this.segments.length - 1; i >= 0; i--) {
             let seg = this.segments[i];
-
-            // A cauda afina suavemente no final
             let sizeRatio = 1 - Math.pow(i / this.segments.length, 3) * 0.5;
             let rad = this.radius * sizeRatio;
 
@@ -222,129 +245,108 @@ class Snake {
             ctx.fillStyle = this.color;
             ctx.fill();
 
-            // Borda do segmento
-            ctx.strokeStyle = "rgba(0,0,0,0.3)";
+            ctx.strokeStyle = "rgba(0,0,0,0.2)";
             ctx.lineWidth = 1;
             ctx.stroke();
 
-            // Detalhe de "Vestido longo / Brilho" a cada X segmentos
-            if (i % 4 === 0 && i !== 0) {
-                ctx.fillStyle = "rgba(255,255,255,0.4)";
+            if (i % 5 === 0 && i !== 0) {
+                ctx.fillStyle = "rgba(255,255,255,0.3)";
                 ctx.beginPath();
                 ctx.arc(seg.x, seg.y, rad * 0.3, 0, Math.PI * 2);
                 ctx.fill();
             }
         }
 
-        // Desenha a Cabeça
         ctx.save();
         ctx.translate(this.x, this.y);
-        ctx.rotate(this.angle); // Rotaciona para a direção do movimento
+        ctx.rotate(this.angle);
 
-        // Brilho / Glow em volta da cabeça
-        ctx.shadowColor = this.color;
-        ctx.shadowBlur = 15;
+        // Glowing effect (Otimizado: apenas para player ou quando visível)
+        if (this.isPlayer) {
+            ctx.shadowColor = this.color;
+            ctx.shadowBlur = 10;
+        }
+
         ctx.beginPath();
         ctx.arc(0, 0, this.radius * 1.1, 0, Math.PI * 2);
         ctx.fillStyle = this.color;
         ctx.fill();
         ctx.shadowBlur = 0;
 
-        // Avatar (Rosto estilo Emoji + Cabelo Desenhado)
         ctx.save();
-        ctx.rotate(Math.PI / 2); // Gira 90 graus para a modelo olhar para frente
+        ctx.rotate(Math.PI / 2);
 
-        // Cabelo parte de tras
         ctx.fillStyle = this.hairColor;
         ctx.beginPath();
-        // Cabelo bem cheio atrás
         ctx.arc(0, 0, this.radius * 1.15, 0, Math.PI * 2);
         ctx.fill();
 
-        // Rosto (Base Amarela Emoji)
-        ctx.fillStyle = "#ffcc00"; // Amarelo clássico de emoji
+        ctx.fillStyle = "#ffcc00";
         ctx.beginPath();
         ctx.arc(0, 0, this.radius * 0.85, 0, Math.PI * 2);
         ctx.fill();
 
-        // Bochechas rosadas
         ctx.fillStyle = "rgba(255, 105, 180, 0.5)";
         ctx.beginPath();
-        ctx.arc(-this.radius * 0.4, this.radius * 0.2, this.radius * 0.15, 0, Math.PI * 2); // Esquerda
-        ctx.arc(this.radius * 0.4, this.radius * 0.2, this.radius * 0.15, 0, Math.PI * 2);  // Direita
+        ctx.arc(-this.radius * 0.4, this.radius * 0.2, this.radius * 0.15, 0, Math.PI * 2);
+        ctx.arc(this.radius * 0.4, this.radius * 0.2, this.radius * 0.15, 0, Math.PI * 2);
         ctx.fill();
 
-        // Olhos (Estilo Emoji Alegre)
         ctx.beginPath();
         ctx.lineCap = "round";
-        ctx.lineWidth = 2.5;
+        ctx.lineWidth = 2;
         ctx.strokeStyle = "#444";
-        // Olho Esquerdo (Curva feliz)
         ctx.arc(-this.radius * 0.3, -this.radius * 0.1, this.radius * 0.15, Math.PI, 0);
-        // Olho Direito (Curva feliz)
         ctx.moveTo(this.radius * 0.15, -this.radius * 0.1);
         ctx.arc(this.radius * 0.3, -this.radius * 0.1, this.radius * 0.15, Math.PI, 0);
         ctx.stroke();
 
-        // Boca (Sorriso Amplo)
         ctx.beginPath();
         ctx.arc(0, this.radius * 0.1, this.radius * 0.4, 0.1 * Math.PI, 0.9 * Math.PI);
         ctx.stroke();
 
-        // Franja / Cabelo da frente (Cobrindo apenas a testa!)
         ctx.fillStyle = this.hairColor;
         ctx.beginPath();
-        // Math.PI até Math.PI*2 desenha o arco na metade DE CIMA
         ctx.arc(0, -this.radius * 0.1, this.radius * 0.9, Math.PI, Math.PI * 2);
         ctx.fill();
 
         ctx.restore();
 
-        // Nome flutuante
-        ctx.rotate(-this.angle); // Desfaz a rotação para o texto ficar reto
-        ctx.font = "bold 14px Outfit";
+        ctx.rotate(-this.angle);
+        ctx.font = "bold 13px Outfit";
         ctx.textAlign = "center";
 
         let textWidth = ctx.measureText(this.name).width;
         ctx.fillStyle = "rgba(0,0,0,0.5)";
         ctx.beginPath();
-        ctx.roundRect(-textWidth / 2 - 6, -this.radius - 28, textWidth + 12, 22, 5);
+        ctx.roundRect(-textWidth / 2 - 6, -this.radius - 28, textWidth + 12, 18, 5);
         ctx.fill();
 
         ctx.fillStyle = "white";
-        ctx.fillText(this.name, 0, -this.radius - 12);
+        ctx.fillText(this.name, 0, -this.radius - 14);
 
         ctx.restore();
     }
 
     eat(value) {
         this.score += value;
-        // Adiciona 1 segmento extra a cada 2 pontos
         let growAmount = Math.ceil(value / 2);
         for (let i = 0; i < growAmount; i++) {
             let last = this.segments[this.segments.length - 1];
             this.segments.push({ x: last.x, y: last.y });
         }
-        // Cresce levemente em espessura até um limite
         this.radius = Math.min(45, 20 + this.score * 0.04);
     }
 
     die() {
-        // Dropa itens equivalente a uma parte da sua pontuação
-        let foodToSpawn = Math.min(100, Math.floor(this.score / 2) + 10);
-
+        let foodToSpawn = Math.min(60, Math.floor(this.score / 2) + 10);
         for (let i = 0; i < foodToSpawn; i++) {
-            // Distribui a comida ao longo dos segmentos do corpo
             let seg = this.segments[Math.floor(Math.random() * this.segments.length)];
-            let x = seg.x + (Math.random() - 0.5) * 50;
-            let y = seg.y + (Math.random() - 0.5) * 50;
-
-            // 20% de chance de dropar um item valioso
-            let isBig = Math.random() > 0.8;
+            let x = seg.x + (Math.random() - 0.5) * 40;
+            let y = seg.y + (Math.random() - 0.5) * 40;
+            let isBig = Math.random() > 0.85;
             foods.push(new Food(x, y, isBig ? 5 : 1));
-
-            // Efeito de explosão de partículas
-            for (let p = 0; p < 3; p++) {
+            if (particles.length < 150) {
                 particles.push(new Particle(x, y, this.color));
             }
         }
@@ -361,65 +363,55 @@ function initGame(pName, pHairColor, pBodyColor) {
     particles = [];
     mouse.active = false;
 
-    // Spawn Bots
-    for (let i = 0; i < 25; i++) {
+    for (let i = 0; i < 20; i++) { // Reduzido bots de 25 para 20
         spawnBot();
     }
 
-    // Spawn Comida Inicial
-    for (let i = 0; i < 400; i++) {
+    for (let i = 0; i < 350; i++) { // Reduzido comida de 400 para 350
         foods.push(new Food(Math.random() * GAME_WIDTH, Math.random() * GAME_HEIGHT));
     }
 
     isPlaying = true;
     lastTime = performance.now();
-
-    // Esconder UI
     startScreen.classList.add('hidden');
     gameOverScreen.classList.add('hidden');
-
     requestAnimationFrame(gameLoop);
 }
 
 function spawnBot() {
     let x = Math.random() * GAME_WIDTH;
     let y = Math.random() * GAME_HEIGHT;
-
-    // Evita spawnar muito perto do player inicial
     if (player && Math.hypot(x - player.x, y - player.y) < 800) {
         x = (x + 1500) % GAME_WIDTH;
     }
-
     let name = botNames[Math.floor(Math.random() * botNames.length)];
     let bot = new Snake(x, y, name, false);
-
-    // Bots dão spawn com tamanhos variados
-    let startScore = Math.floor(Math.random() * 60) + 5;
+    let startScore = Math.floor(Math.random() * 40) + 5;
     bot.score = startScore;
     bot.eat(0);
     bots.push(bot);
 }
 
 function checkCollisions() {
-    // 1. Coleta de Itens
+    // 1. Coleta de Itens (Otimizado: apenas player e bots próximos)
     for (let i = foods.length - 1; i >= 0; i--) {
         let f = foods[i];
-        let d = Math.hypot(player.x - f.x, player.y - f.y);
 
-        // Player comeu
+        // Player come
+        let d = Math.hypot(player.x - f.x, player.y - f.y);
         if (d < player.radius + f.radius) {
             player.eat(f.value);
-            // Efeito visual de brilho
-            for (let p = 0; p < 5; p++) particles.push(new Particle(f.x, f.y, "#ffd700"));
+            if (particles.length < 200) {
+                for (let p = 0; p < 3; p++) particles.push(new Particle(f.x, f.y, "#ffd700"));
+            }
             foods.splice(i, 1);
             continue;
         }
 
-        // Bot comeu
+        // Bots comem (apenas se estiverem "perto" do player para economizar CPU, ou loop normal simplificado)
         for (let bot of bots) {
             let dBot = Math.hypot(bot.x - f.x, bot.y - f.y);
-            // Bots tem 'hitbox' de coleta ligeiramente maior para compensar a IA simples
-            if (dBot < bot.radius + f.radius + 15) {
+            if (dBot < bot.radius + f.radius + 10) {
                 bot.eat(f.value);
                 foods.splice(i, 1);
                 break;
@@ -427,44 +419,46 @@ function checkCollisions() {
         }
     }
 
-    // Respawna comidas gradualmente no mapa
-    if (foods.length < 300 && Math.random() < 0.1) {
+    if (foods.length < 300 && Math.random() < 0.05) {
         foods.push(new Food(Math.random() * GAME_WIDTH, Math.random() * GAME_HEIGHT));
     }
 
-    // 2. Colisão Mortal (Morte se a CABEÇA encostar no CORPO do Oponente)
+    // 2. Colisões de Cobras
     let allSnakes = [player, ...bots];
     let deadSnakes = [];
 
     for (let s1 of allSnakes) {
-        for (let s2 of allSnakes) {
-            if (s1 === s2) continue; // Ignora colisão consigo mesmo
+        if (s1.dead) {
+            if (!deadSnakes.includes(s1)) deadSnakes.push(s1);
+            continue;
+        }
 
-            // Check: A cabeça da cobra s1 bateu em algum segmento da cobra s2
-            for (let i = 0; i < s2.segments.length; i += 2) { // Checa de 2 em 2 para otimização
+        for (let s2 of allSnakes) {
+            if (s1 === s2) continue;
+
+            // Distância grosseira antes de checar segmentos (Otimização)
+            if (Math.hypot(s1.x - s2.x, s1.y - s2.y) > 1500) continue;
+
+            for (let i = 0; i < s2.segments.length; i += 3) { // Checa a cada 3 segmentos (Otimização)
                 let seg = s2.segments[i];
                 let d = Math.hypot(s1.x - seg.x, s1.y - seg.y);
-
-                // Hitbox um pouco menor que o raio visual pra parecer mais justo (forgiving)
                 let hitDist = (s1.radius * 0.7) + (s2.radius * 0.7);
                 if (d < hitDist) {
                     if (!deadSnakes.includes(s1)) deadSnakes.push(s1);
-                    break; // s1 já morreu, para a checagem pros outros segmentos
+                    break;
                 }
             }
+            if (deadSnakes.includes(s1)) break;
         }
     }
 
-    // Processa os mortos
     for (let snake of deadSnakes) {
-        snake.die(); // Explode em partículas e itens
-
+        snake.die();
         if (snake === player) {
-            endGame(); // O jogador morreu
+            endGame();
         } else {
             let index = bots.indexOf(snake);
             if (index !== -1) bots.splice(index, 1);
-            // Repõe o bot na arena após 3 segundos
             setTimeout(spawnBot, 3000);
         }
     }
@@ -472,9 +466,7 @@ function checkCollisions() {
 
 function updateLeaderboard() {
     let allSnakes = [player, ...bots];
-    // Ordena por Fama (Score) descendente
     allSnakes.sort((a, b) => b.score - a.score);
-
     let html = "";
     for (let i = 0; i < Math.min(10, allSnakes.length); i++) {
         let s = allSnakes[i];
@@ -488,25 +480,19 @@ function updateLeaderboard() {
 }
 
 function drawBackground() {
-    // Fundo Base 
-    ctx.fillStyle = "#01011A";
-    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    // Desenha o grid usando o canvas pre-renderizado (Muito mais rápido!)
+    const step = 1000;
+    const startX = Math.floor(camera.x / step) * step;
+    const startY = Math.floor(camera.y / step) * step;
 
-    // Grid simulando uma grande passarela / pista de estilo
-    ctx.strokeStyle = "rgba(255, 42, 109, 0.08)";
-    ctx.lineWidth = 2;
-    const step = 150;
-
-    ctx.beginPath();
-    for (let x = 0; x <= GAME_WIDTH; x += step) {
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, GAME_HEIGHT);
+    // Desenha tiles visíveis
+    for (let x = startX - step; x <= startX + canvas.width + step; x += step) {
+        for (let y = startY - step; y <= startY + canvas.height + step; y += step) {
+            if (x >= 0 && x < GAME_WIDTH && y >= 0 && y < GAME_HEIGHT) {
+                ctx.drawImage(bgCanvas, x, y);
+            }
+        }
     }
-    for (let y = 0; y <= GAME_HEIGHT; y += step) {
-        ctx.moveTo(0, y);
-        ctx.lineTo(GAME_WIDTH, y);
-    }
-    ctx.stroke();
 
     // Bordas do Mundo (Neon Cyan)
     ctx.strokeStyle = "rgba(5, 217, 232, 0.8)";
@@ -515,18 +501,22 @@ function drawBackground() {
 }
 
 function gameLoop(time) {
-    if (!isPlaying) return; // Pausa se acabou
+    if (!isPlaying) return;
 
     let dt = time - lastTime;
     lastTime = time;
     frameCount++;
 
-    // 1. Lógica (Update)
     player.update(dt);
     for (let bot of bots) bot.update(dt);
-    for (let food of foods) food.update(time);
 
-    // Atualiza partículas de trás pra frente para poder remover
+    // Otimização: Update de comida apenas para as visíveis ou a cada N frames
+    for (let food of foods) {
+        if (Math.hypot(food.x - player.x, food.y - player.y) < 1000) {
+            food.update(time);
+        }
+    }
+
     for (let i = particles.length - 1; i >= 0; i--) {
         particles[i].update();
         if (particles[i].life <= 0) particles.splice(i, 1);
@@ -534,44 +524,40 @@ function gameLoop(time) {
 
     checkCollisions();
 
-    // Atualiza Placar a cada 20 frames (Otimização)
-    if (frameCount % 20 === 0) {
+    if (frameCount % 30 === 0) {
         updateLeaderboard();
     }
 
-    // 2. Movimento da Câmera
-    // A câmera foca no player
     let targetCamX = player.x - canvas.width / 2;
     let targetCamY = player.y - canvas.height / 2;
+    let targetZoom = 1 - (player.score * 0.00025);
+    targetZoom = Math.max(0.45, targetZoom);
 
-    // Afasta o zoom progressivamente conforme a cobra cresce
-    let targetZoom = 1 - (player.score * 0.0003);
-    targetZoom = Math.max(0.4, targetZoom); // Zoom máximo fora
-
-    // Suavização da câmera (Lerp)
     camera.x += (targetCamX - camera.x) * 0.1;
     camera.y += (targetCamY - camera.y) * 0.1;
     camera.zoom += (targetZoom - camera.zoom) * 0.05;
 
-    // 3. Renderização Escura fora do mapa
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.save();
-
-    // Aplicação do Zoom centrado na tela
     ctx.translate(canvas.width / 2, canvas.height / 2);
     ctx.scale(camera.zoom, camera.zoom);
     ctx.translate(-canvas.width / 2, -canvas.height / 2);
-
-    // Aplicação do pan da câmera
     ctx.translate(-camera.x, -camera.y);
 
     drawBackground();
 
-    // Ordem de desenho (Z-Index): Comida -> Particulas -> Bots -> Player(sempre em cima)
-    for (let food of foods) food.draw(ctx);
+    // Culling para Comida
+    const viewDist = 1000 / camera.zoom;
+    for (let food of foods) {
+        if (Math.abs(food.x - player.x) < viewDist && Math.abs(food.y - player.y) < viewDist) {
+            food.draw(ctx);
+        }
+    }
+
     for (let particle of particles) particle.draw(ctx);
+
     for (let bot of bots) {
         if (bot !== player) bot.draw(ctx);
     }
@@ -579,7 +565,7 @@ function gameLoop(time) {
 
     ctx.restore();
 
-    requestAnimationFrame(gameLoop); // Ciclo contínuo
+    requestAnimationFrame(gameLoop);
 }
 
 function endGame() {
@@ -597,31 +583,25 @@ restartBtn.addEventListener('click', () => {
     initGame(playerNameInput.value, document.getElementById('hair-color').value, document.getElementById('body-color').value);
 });
 
-
-// Animação leve na Tela Inicial (Idle Box Background)
+// Animação leve na Tela Inicial
 let idleAngle = 0;
 function idleLoop(time) {
-    if (isPlaying) return; // Para quando entra no jogo
-
-    ctx.fillStyle = "rgba(1, 1, 43, 0.05)"; // Efeito rastro tela de inicio
+    if (isPlaying) return;
+    ctx.fillStyle = "rgba(1, 1, 43, 0.1)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-
     let cx = canvas.width / 2;
     let cy = canvas.height / 2;
-
     idleAngle += 0.015;
-    let x = cx + Math.cos(idleAngle) * 300;
-    let y = cy + Math.sin(idleAngle * 2) * 150;
-
+    let x = cx + Math.cos(idleAngle) * 200;
+    let y = cy + Math.sin(idleAngle * 2) * 100;
     ctx.shadowColor = "#ff2a6d";
-    ctx.shadowBlur = 30;
+    ctx.shadowBlur = 20;
     ctx.beginPath();
-    ctx.arc(x, y, 20, 0, Math.PI * 2);
+    ctx.arc(x, y, 15, 0, Math.PI * 2);
     ctx.fillStyle = "#ff2a6d";
     ctx.fill();
     ctx.shadowBlur = 0;
-
     requestAnimationFrame(idleLoop);
 }
-// Começa a animação da tela de menu
 idleLoop(0);
+
