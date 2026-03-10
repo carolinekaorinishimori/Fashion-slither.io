@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Fashion Slither</title>
+    <meta name="description" content="Um jogo arcade multiplayer onde você é uma modelo buscando fama!">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="ui-layer">
+        <!-- Leaderboard (Placar) -->
+        <div id="leaderboard">
+            <h2>👑 Top Fama</h2>
+            <ul id="leaderboard-list"></ul>
+        </div>
+        
+        <!-- Tela de Fim de Jogo -->
+        <div id="game-over-screen" class="screen-overlay hidden">
+            <h1 class="glitch-text">Fim de Carreira</h1>
+            <p>Sua Fama Final: <span id="final-score">0</span></p>
+            <button id="restart-btn">Desfilar Novamente</button>
+        </div>
+        
+        <!-- Tela Inicial -->
+        <div id="start-screen" class="screen-overlay">
+            <h1 class="title">Fashion<br>Slither</h1>
+            <p>Colete likes, desvie das rivais e seja a rainha da passarela!</p>
+            <input type="text" id="player-name" placeholder="Nome da Modelo" maxlength="15" autocomplete="off">
+            <button id="start-btn">Entrar na Passarela</button>
+        </div>
+        
+        <!-- Dica de Controle -->
+        <div id="controls-hint">Controle pelo cursor do mouse ou toque na tela</div>
+    </div>
+    
+    <canvas id="game-canvas"></canvas>
+    
+    <script src="script.js"></script>
+</body>
+</html>
