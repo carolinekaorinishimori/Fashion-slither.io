@@ -300,31 +300,7 @@ button:active {
     letter-spacing: 1px;
 }
 
-select#player-emoji {
-    padding: 10px 15px;
-    border-radius: 15px;
-    border: 2px solid var(--primary);
-    background: rgba(255, 255, 255, 0.1);
-    color: white;
-    font-size: 1.5rem;
-    font-family: 'Outfit', sans-serif;
-    outline: none;
-    cursor: pointer;
-    transition: all 0.3s;
-}
-
-select#player-emoji:focus {
-    box-shadow: 0 0 15px var(--primary);
-    background: rgba(255, 255, 255, 0.2);
-}
-
-select#player-emoji option {
-    background: var(--bg-dark);
-    color: white;
-    font-size: 1.2rem;
-}
-
-input[type="color"]#player-color {
+input[type="color"] {
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
@@ -336,18 +312,18 @@ input[type="color"]#player-color {
     padding: 0;
 }
 
-input[type="color"]#player-color::-webkit-color-swatch {
+input[type="color"]::-webkit-color-swatch {
     border-radius: 50%;
     border: 3px solid rgba(255, 255, 255, 0.3);
     transition: all 0.3s ease;
 }
 
-input[type="color"]#player-color::-webkit-color-swatch:hover {
+input[type="color"]::-webkit-color-swatch:hover {
     border-color: white;
     box-shadow: 0 0 15px var(--primary);
 }
 
-input[type="color"]#player-color::-moz-color-swatch {
+input[type="color"]::-moz-color-swatch {
     border-radius: 50%;
     border: 3px solid rgba(255, 255, 255, 0.3);
 }
@@ -357,12 +333,7 @@ input[type="color"]#player-color::-moz-color-swatch {
         gap: 10px;
     }
 
-    select#player-emoji {
-        font-size: 1.2rem;
-        padding: 8px 10px;
-    }
-
-    input[type="color"]#player-color {
+    input[type="color"] {
         width: 40px;
         height: 40px;
     }

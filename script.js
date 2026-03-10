@@ -26,6 +26,7 @@ let particles = [];
 const botNames = ["Gisele", "Naomi", "Kendall", "Bella", "Gigi", "Tyra", "Heidi", "Adriana", "Cara", "Miranda", "Karlie", "Alessandra"];
 const foodEmojis = ["✨", "💎", "⭐", "💄", "👠", "👜", "💋", "👗", "🎀"];
 const botColors = ["#05d9e8", "#ff00ff", "#ffd700", "#00ff00", "#ffaa00", "#9900ff", "#ff5555"];
+const botHairColors = ["#000000", "#ffbb00", "#8b4513", "#a52a2a", "#808080", "#baa3ff", "#ff69b4"];
 
 // Input (Mouse / Touch)
 let mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2, active: false };
@@ -100,10 +101,10 @@ class Food {
 }
 
 class Snake {
-    constructor(x, y, name, isPlayer = false, customEmoji = null, customColor = null) {
+    constructor(x, y, name, isPlayer = false, customHairColor = null, customBodyColor = null) {
         this.isPlayer = isPlayer;
         this.name = name;
-        this.faceEmoji = isPlayer ? (customEmoji || "👩") : (Math.random() > 0.5 ? "👱‍♀️" : "👩‍🦰");
+        this.hairColor = isPlayer ? (customHairColor || "#ffbb00") : botHairColors[Math.floor(Math.random() * botHairColors.length)];
 
         this.x = x;
         this.y = y;
@@ -121,7 +122,7 @@ class Snake {
         this.radius = 20; // Espessura
         this.score = 0;   // Pontuação de fama
 
-        this.color = isPlayer ? (customColor || "#ff2a6d") : botColors[Math.floor(Math.random() * botColors.length)];
+        this.color = isPlayer ? (customBodyColor || "#ff2a6d") : botColors[Math.floor(Math.random() * botColors.length)];
 
         // Inicializa o corpo encolhido no ponto de spawn
         for (let i = 0; i < this.length; i++) {
@@ -249,13 +250,34 @@ class Snake {
         ctx.fill();
         ctx.shadowBlur = 0;
 
-        // Avatar (Emoji da Modelo)
+        // Avatar (Rosto + Cabelo Desenhado)
         ctx.save();
         ctx.rotate(Math.PI / 2); // Gira 90 graus para a modelo olhar para frente
-        ctx.font = `${this.radius * 1.8}px Arial`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(this.faceEmoji, 0, 0);
+
+        // Cabelo parte de tras
+        ctx.fillStyle = this.hairColor;
+        ctx.beginPath();
+        ctx.arc(0, -this.radius * 0.2, this.radius * 1.1, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Rosto
+        ctx.fillStyle = "#ffdbac"; // Pele cor genérica
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius * 0.8, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Franja / Cabelo da frente
+        ctx.fillStyle = this.hairColor;
+        ctx.beginPath();
+        ctx.arc(0, -this.radius * 0.3, this.radius * 0.85, 0, Math.PI);
+        ctx.fill();
+
+        // Olhos (Óculos escuros de moda)
+        ctx.fillStyle = "#111";
+        ctx.beginPath();
+        ctx.roundRect(-this.radius * 0.4, -this.radius * 0.1, this.radius * 0.8, this.radius * 0.3, 3);
+        ctx.fill();
+
         ctx.restore();
 
         // Nome flutuante
@@ -311,9 +333,9 @@ class Snake {
 
 // ----- Funções Principais -----
 
-function initGame(pName, pEmoji, pColor) {
+function initGame(pName, pHairColor, pBodyColor) {
     let nome = pName.trim() || "Super Model";
-    player = new Snake(GAME_WIDTH / 2, GAME_HEIGHT / 2, nome, true, pEmoji, pColor);
+    player = new Snake(GAME_WIDTH / 2, GAME_HEIGHT / 2, nome, true, pHairColor, pBodyColor);
     bots = [];
     foods = [];
     particles = [];
@@ -548,11 +570,11 @@ function endGame() {
 
 // Listeners de UI
 startBtn.addEventListener('click', () => {
-    initGame(playerNameInput.value, document.getElementById('player-emoji').value, document.getElementById('player-color').value);
+    initGame(playerNameInput.value, document.getElementById('hair-color').value, document.getElementById('body-color').value);
 });
 
 restartBtn.addEventListener('click', () => {
-    initGame(playerNameInput.value, document.getElementById('player-emoji').value, document.getElementById('player-color').value);
+    initGame(playerNameInput.value, document.getElementById('hair-color').value, document.getElementById('body-color').value);
 });
 
 
